@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Knowledge Graph</title>
+  <style>
+    body, #2d-graph {
+      margin: 0;
+      width: 100vw;
+      height: 100vh;
+    }
+    #controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <label>
+      <input type="checkbox" id="toggleNode1" checked>
+      Node 1
+    </label>
+  </div>
+  <div id="2d-graph"></div>
+  <script src="https://unpkg.com/force-graph"></script>
+  <script>
+    // Define the nodes and links of the knowledge graph
+    const graphData = {
+      nodes: [
+        { id: 1, label: 'Adaptive cutting' },
+        { id: 2, label: 'WeldPlanner' },
+        { id: 3, label: 'Adaptive grinding' },
+        { id: 4, label: 'Adaptive mounting' },
+        { id: 5, label: '2D-scanning' },
+        { id: 6, label: 'Automated Quality control' },
+        { id: 7, label: 'Verdal' },
+        { id: 8, label: 'Cold cracking' },
+        { id: 9, label: 'Holding time' },
+        { id: 10, label: 'Robotized NDT' },
+        { id: 11, label: 'Custom NDT-probe' },
+        { id: 12, label: 'Al-enhanced defect detection' },
+        { id: 13, label: 'Production Flow Optimizer / Logistics' },
+        { id: 14, label: 'CAJAC' },
+        { id: 15, label: 'Robotic Orbital welding' },
+        { id: 16, label: 'Crawler' },
+        { id: 17, label: 'Procedures for upward welding' }
+      ],
+      links: [
+        { source: 7, target: 1, width: 2 + 2.7 }, // Verdal -> Adaptive cutting
+        { source: 7, target: 2, width: 2 + 3.7 }, // Verdal -> WeldPlanner
+        { source: 7, target: 3, width: 2 + 2.3 }, // Verdal -> Adaptive grinding
+        { source: 7, target: 4, width: 2 + 2.7 }, // Verdal -> Adaptive mounting
+        { source: 7, target: 5, width: 2 + 3.8 }, // Verdal -> 2D-scanning
+        { source: 7, target: 6, width: 2 + 1.1 }, // Verdal -> Automated Quality control
+        { source: 6, target: 8, width: 2 + 1.1 }, // Automated Quality control -> Cold cracking
+        { source: 6, target: 9, width: 2 + 1.1 }, // Automated Quality control -> Holding time
+        { source: 6, target: 10, width: 2 + 1.1 }, // Automated Quality control -> Robotized NDT
+        { source: 10, target: 11, width: 2 + 0.1 }, // Robotized NDT -> Custom NDT-probe
+        { source: 7, target: 12, width: 2 + 1.6 }, // Verdal -> Al-enhanced defect detection
+        { source: 7, target: 13, width: 2 + 2.6 }, // Verdal -> Production Flow Optimizer / Logistics
+        { source: 7, target: 14, width: 2 + 2.8 }, // Verdal -> CAJAC
+        { source: 7, target: 15, width: 2 + 2.4 }, // Verdal -> Robotic Orbital welding
+        { source: 15, target: 16, width: 2 + 2.4 }, // Robotic Orbital welding -> Crawler
+        { source: 15, target: 17, width: 2 + 0.2 }  // Robotic Orbital welding -> Procedures for upward welding
+      ]
+    };
+    // Calculate node sizes based on number of links
+    graphData.nodes.forEach(node => {
+      const linkCount = graphData.links.filter(link => link.source === node.id || link.target === node.id).length;
+      node.val = linkCount;
+    });
+
+    // Create the force-directed graph
+    const graph = ForceGraph()(document.getElementById('2d-graph'))
+      .graphData(graphData)
+      .nodeLabel('label')
+      .nodeAutoColorBy('id') // Ensure every node gets a color based on its ID
+      .nodeCanvasObject((node, ctx, globalScale) => {
+        const fontSize = 12 / globalScale;
+        const label = node.label;
+        ctx.font = `${fontSize}px Sans-Serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = node.color;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, Math.sqrt(node.val) * 5, 0, 2 * Math.PI, false); // Size based on val
+        ctx.fill();
+        ctx.fillStyle = 'black';
+        ctx.fillText(label, node.x, node.y + 5); // Adjust the label position
+      })
+      .linkWidth(link => link.width) // Use the width property of the link
+      .linkDirectionalArrowLength(0) // Disable default arrow rendering
+      .linkDirectionalArrowRelPos(1)
+      .linkCanvasObject((link, ctx, globalScale) => {
+        const start = link.source;
+        const end = link.target;
+        if (!start || !end) return;
+
+        const arrowLength = 12 / globalScale; // Arrow length
+        const arrowWidth = 8 / globalScale; // Arrow width
+        const headlen = arrowLength; // length of head in pixels
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const angle = Math.atan2(dy, dx);
+
+        // Compute new end point for the arrow, 60% from the source node
+        const offsetFactor = 0.6; // Adjust this factor to place the arrowhead at a different point along the link
+        const newEndX = start.x + offsetFactor * dx;
+        const newEndY = start.y + offsetFactor * dy;
+
+        // Draw link line
+        ctx.strokeStyle = link.color || 'rgba(0,0,0,0.5)';
+        ctx.lineWidth = link.width / globalScale; // Use the width property of the link
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y); // Draw the full link
+        ctx.stroke();
+
+        // Draw arrow head
+        ctx.beginPath();
+        ctx.moveTo(newEndX, newEndY);
+        ctx.lineTo(newEndX - headlen * Math.cos(angle - Math.PI / 6), newEndY - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(newEndX - headlen * Math.cos(angle + Math.PI / 6), newEndY - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.lineTo(newEndX, newEndY);
+        ctx.closePath();
+        ctx.fillStyle = link.color || 'rgba(0,0,0,0.5)';
+        ctx.fill();
+      })
+      .onNodeDrag(node => {
+        // Fix node position while dragging
+        node.fx = node.x;
+        node.fy = node.y;
+      })
+      .onNodeDragEnd(node => {
+        // Keep the node fixed after dragging
+        node.fx = node.x;
+        node.fy = node.y;
+      })
+      .onNodeClick(node => {
+        if (node.fx !== undefined) {
+          // Release the node from its fixed position
+          node.fx = undefined;
+          node.fy = undefined;
+          // Intensify the force pulling it back to the origin
+          graph.d3Force('charge').strength(-200); // Increase the repulsion force
+          graph.d3Force('link').distance(20); // Decrease the link distance for tighter clustering
+          graph.resetSimulation(); // Restart the simulation with the new forces
+        } else {
+          // Find connected nodes and links
+          const connectedNodes = new Set();
+          const connectedLinks = new Set();
+          graph.graphData().links.forEach(link => {
+            if (link.source.id === node.id || link.target.id === node.id) {
+              connectedNodes.add(link.source.id);
+              connectedNodes.add(link.target.id);
+              connectedLinks.add(link);
+            }
+          });
+
+          // Update node and link colors
+          graph
+            .nodeColor(n => connectedNodes.has(n.id) ? n.color : 'rgba(150,150,150,0.5)')
+            .linkColor(l => connectedLinks.has(l) ? l.color : 'rgba(150,150,150,0.5)')
+            .nodeCanvasObject((n, ctx, globalScale) => {
+              const fontSize = 12 / globalScale;
+              const label = n.label;
+              ctx.font = `${fontSize}px Sans-Serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = n.color;
+              ctx.beginPath();
+              ctx.arc(n.x, n.y, Math.sqrt(n.val) * 5, 0, 2 * Math.PI, false); // Size based on val
+              ctx.fill();
+              ctx.fillStyle = 'black';
+              ctx.fillText(label, n.x, n.y + 15); // Adjust the label position
+            });
+        }
+      })
+      .onBackgroundClick(() => {
+        // Reset node and link colors
+        graph
+          .nodeColor(node => node.color)
+          .linkColor(link => link.color)
+          .nodeCanvasObject((node, ctx, globalScale) => {
+            const fontSize = 12 / globalScale;
+            const label = node.label;
+            ctx.font = `${fontSize}px Sans-Serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = node.color;
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, Math.sqrt(node.val) * 5, 0, 2 * Math.PI, false); // Size based on val
+            ctx.fill();
+            ctx.fillStyle = 'black';
+            ctx.fillText(label, node.x, node.y + 15); // Adjust the label position
+          });
+
+        // Reset the force intensities
+        graph.d3Force('charge').strength(-50); // Reset the repulsion force
+        graph.d3Force('link').distance(50); // Reset the link distance
+        graph.resetSimulation(); // Restart the simulation with the new forces
+      });
+  </script>
+</body>
+</html>
